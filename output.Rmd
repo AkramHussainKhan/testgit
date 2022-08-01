@@ -1,0 +1,270 @@
+---
+title: "learning"
+author: "akram"
+date: '2022-07-22'
+output:
+  html_document: default
+---
+We will perform some specific clustering algorithms to predict category of the product from our dataset only using numeric variables.
+
+**Step 1: Load Necessary Libraries**\   
+First, we’ll load the necessary libraries for our example:
+
+```{r}
+library(openxlsx)#for importing the excel file into r.
+library(MASS)
+library(ggplot2)
+library(caret)
+```
+
+**Step 2: Loading the Data**\
+We now load our required dataset and make it a dataframe.
+
+```{r}
+setwd(setwd("G:/cognitive/learning r"))
+dt<-read.xlsx("G:/cognitive/learning r/Superstore.xlsx")
+dt<-data.frame(dt)
+```
+
+Now we will look at the data.
+```{r}
+head(dt)
+```
+
+
+```{r}
+names(dt)
+```
+Here,now  we take our required variables and make it to a dataframe.
+
+```{r}
+rdf<-dt[,c('Category', 'Sales','Quantity','Discount','Profit')]
+```
+
+Our new data islook like,
+```{r}
+head(rdf)
+```
+
+**Step 3: Scale the Data**\
+One of the key assumptions of linear discriminant analysis is that each of the predictor variables have the same variance. An easy way to assure that this assumption is met is to scale each variable such that it has a mean of 0 and a standard deviation of 1.
+
+We can quickly do so in R by using the `scale()` function:
+
+```{r}
+rdf[2:5] <- scale(rdf[2:5])
+
+```
+If we check the mean and variance, we will find that it is scaled.
+```{r}
+apply(rdf[2:5], 2, mean)
+apply(rdf[2:5], 2, sd)
+```
+**Step 4: Create Training and Test Samples**\
+Next, we’ll split the dataset into a training set to train the model on and a testing set to test the model on:
+
+
+```{r}
+#make this example reproducible
+set.seed(1)
+
+#Use 70% of dataset as training set and remaining 30% as testing set
+sample <- sample(c(TRUE, FALSE), nrow(rdf), replace=TRUE, prob=c(0.7,0.3))
+train <- rdf[sample, ]
+test <- rdf[!sample, ] 
+```
+If we look at our train dataset,
+
+
+```{r}
+head(train)
+```
+# Linear Discriminant analysis
+
+**Step 5: Fit the LDA Model**\
+Next, we’ll use the `lda()` function from the MASS package to fit the LDA model to our data:
+```{r}
+modellda <- lda(Category~., data=train)
+modellda
+```
+**Step 6: Use the Model to Make Predictions** \
+Once we’ve fit the model using our training data, we can use it to make predictions on our test data:
+```{r}
+#use LDA model to make predictions on test data
+predictedlda <- predict(modellda, test)
+
+names(predictedlda)
+```
+
+```{r}
+head(predictedlda$class)
+```
+We can use the following code to see what percentage of observations the LDA model correctly predicted the Species for:
+```{r}
+#find accuracy of model
+mean(predictedlda$class==test$Category)
+```
+It turns out that the model correctly predicted the Species for 60% of the observations in our test dataset.
+
+If we want to compare our original category with prediction we find:
+
+```{r}
+test$Category<- as.factor(test$Category)
+table(test$Category, predictedlda$class)
+```
+
+
+**Step 7: Visualize the Results**\
+Lastly, we can create an LDA plot to view the linear discriminants of the model and visualize how well it separated the three different species in our dataset:
+```{r}
+#define data to plot
+lda_plot <- cbind(train, predict(modellda)$x)
+
+#create plot
+ggplot(lda_plot, aes(LD1, LD2)) +
+  geom_point(aes(color = Category))
+```
+
+
+# Random Forest Model\
+
+**Load the Necessary Packages**
+```{r}
+library(randomForest)
+```
+We did preprocessing of our dataset before.
+
+**Fit the Random Forest Model**\
+The following code shows how to fit a random forest model in R using the `randomForest()` function from the randomForest package.
+
+First we will make our dependent variable as factor.
+
+```{r}
+train$Category = factor(train$Category) 
+```
+
+Now, we will fit the model,
+```{r}
+#make this example reproducible
+set.seed(1)
+
+#fit the random forest model
+
+modelrf <- randomForest(Category ~ ., 
+                        data = train, 
+                        importance = TRUE,
+                        proximity = TRUE)
+
+#display fitted model
+modelrf
+```
+
+
+From the output we can see that there is a number of explanations of our model itself, like type, tree count, variable count, etc. The one that is most interesting is the OOB, estimate of error rate. OOB stands for out of bag error, what that means is that when we are taking samples of data to train each version of the model, we will have some data that is left out. For that left out data or as we call it out of bag data, the model produces predictions for it and compares it to its actuals giving us the error rate we see above. The way the error is calculated above is by taking the mis classified count and identifying what portion of the total class it accounted for. 
+
+Now, we can predict from this model.
+```{r}
+# Predicting the Test set results
+y_pred = predict(modelrf, newdata = test)
+
+```
+We can compare our original classes to predicted classes from the below code.
+```{r}
+test$Category<-as.factor(test$Category)
+# Confusion Matrix
+confusion_mtx = confusionMatrix(test$Category, y_pred)
+confusion_mtx
+```
+
+We cann see that the model accuracy is 79.41%.
+We can now plot the model.
+```{r}
+# Plotting model
+plot(modelrf)
+```
+```{r}
+#varImpPlot(modelrf)
+```
+
+
+
+# Support vector machine\
+
+**Load the Necessary Packages**\
+Here first we will load our necessary packges for modelling svm.
+
+```{r}
+library(e1071)
+```
+
+now we will fit our data.
+
+```{r}
+train$Category<-as.factor(train$Category)
+
+modelsvm <- svm(Category ~., data = train)
+modelsvm
+summary(modelsvm)
+```
+
+
+From the model we can predict our test dataset.
+
+```{r}
+test_pred <- predict(modelsvm, newdata = test)
+
+```
+
+
+```{r}
+confusionMatrix(test_pred, test$Category)
+```
+
+We can see that  our model accuracy is 68.01%
+
+
+# Knn algorithm\
+**Load the Necessary Packages**\
+
+```{r}
+library(class)
+```
+
+
+```{r}
+# Feature Scaling
+train_scale <- scale(train[, 2:5])
+test_scale <- scale(test[, 2:5])
+```
+
+Now, we will run our model.
+```{r}
+classifier_knn <- knn(train = train_scale,
+                      test = test_scale,
+                      cl = train$Category,
+                      k = 1)
+```
+We can now compare our original dataset to the models prediction.
+```{r}
+# Confusiin Matrix
+cm <- table(test$Category, classifier_knn)
+cm
+```
+
+```{r}
+# Model Evaluation - 
+# Calculate out of Sample error
+misClassError <- mean(classifier_knn != test$Category)
+print(paste('Accuracy =', 1-misClassError))
+```
+We can see that our accuracy is  almost 55%.
+
+Now, if we summarize we can see that the lda model has 60% accuracy. The random forest model has almost 80% accuracy. The SVM model has 68% accuracy and the KNN has 55% accuracy.
+Based on accuracy we can say thar the random forest model is the best model.
+
+The random sampling technique used in selecting the optimal splitting feature lowers the correlation and hence, the variance of the regression trees. It improves the predictive capability of distinct trees in the forest. The sampling using bootstrap also increases independence among individual trees.
+Among all the available classification methods, random forests provide the highest accuracy.
+
+
+
+
